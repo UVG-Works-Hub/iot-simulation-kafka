@@ -78,19 +78,18 @@ func generateSensorData() (string, error) {
 	return string(jsonData), nil
 }
 
-func Producer() {
+// Producer sends sensor data to the specified Kafka topic
+func Producer(brokerAddress, topic string) {
 	// Initialize the seed for random number generation
 	rand.Seed(time.Now().UnixNano())
 
 	// Kafka Writer (Producer) configuration
-	brokerAddress := "164.92.76.15:9092" // IP and port of the Kafka server
-	topic := "21881"
-
 	writer := kafka.Writer{
 		Addr:         kafka.TCP(strings.Split(brokerAddress, ",")[0]),
 		Topic:        topic,
 		Balancer:     &kafka.LeastBytes{},
 		RequiredAcks: kafka.RequireAll,
+		Async:        false, // Synchronous writes to catch errors immediately
 	}
 	defer writer.Close()
 

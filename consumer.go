@@ -14,12 +14,9 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-func Consumer() {
+// Consumer reads messages from a Kafka topic and writes them to a CSV file
+func Consumer(brokerAddress, topic, groupID string) {
 	// Kafka Reader (Consumer) configuration
-	brokerAddress := "164.92.76.15:9092" // IP and port of the Kafka server
-	topic := "21881"
-	groupID := "weather_group"
-
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{brokerAddress},
 		GroupID:        groupID,
@@ -47,7 +44,11 @@ func Consumer() {
 		log.Fatalf("Error getting file information: %v\n", err)
 	}
 	if fi.Size() == 0 {
-		writer.Write([]string{"Timestamp", "Temperature (°C)", "Humidity (%)", "Wind Direction"})
+		err = writer.Write([]string{"Timestamp", "Temperature (°C)", "Humidity (%)", "Wind Direction"})
+		if err != nil {
+			log.Fatalf("Error writing CSV headers: %v\n", err)
+		}
+		writer.Flush()
 	}
 
 	fmt.Println("Kafka Consumer started. Listening for messages and writing to sensor_data.csv...")
