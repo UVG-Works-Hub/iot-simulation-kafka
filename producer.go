@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
@@ -64,22 +63,17 @@ func generateWindDirection() string {
 	return directions[rand.Intn(len(directions))]
 }
 
-// Generates sensor data in JSON format
-func generateSensorData() (string, error) {
-	data := SensorData{
+// Generates sensor data
+func generateSensorData() SensorData {
+	return SensorData{
 		Temperature:   generateTemperature(),
 		Humidity:      generateHumidity(),
 		WindDirection: generateWindDirection(),
 	}
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-	return string(jsonData), nil
 }
 
-// Producer sends sensor data to the specified Kafka topic with configurable intervals
-func Producer(brokerAddress, topic string, minInterval, maxInterval int) {
+// Producer sends sensor data to the specified Kafka topic with configurable intervals and mode
+func Producer(brokerAddress, topic string, minInterval, maxInterval int, mode string) {
 	// Initialize the seed for random number generation
 	rand.Seed(time.Now().UnixNano())
 
@@ -93,19 +87,41 @@ func Producer(brokerAddress, topic string, minInterval, maxInterval int) {
 	}
 	defer writer.Close()
 
-	fmt.Printf("Kafka Producer started. Sending data every %d-%d seconds...\n", minInterval, maxInterval)
+	fmt.Printf("Kafka Producer started in %s mode. Sending data every %d-%d seconds...\n", mode, minInterval, maxInterval)
 
 	for {
-		sensorData, err := generateSensorData()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error generating sensor data: %v\n", err)
-			continue
+		sensorData := generateSensorData()
+
+		var payload []byte
+		var err error
+
+		if mode == "json" {
+			// JSON Mode
+			payloadStr, err := sensorData.ToJSON()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating JSON sensor data: %v\n", err)
+				continue
+			}
+			payload = []byte(payloadStr)
+		} else if mode == "compact" {
+			// Show original data
+			fmt.Printf("Original data: %v\n", sensorData)
+
+			// Compact Mode
+			payload, err = sensorData.Encode()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error encoding sensor data: %v\n", err)
+				continue
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Unknown mode: %s. Exiting.\n", mode)
+			os.Exit(1)
 		}
 
 		// Create the Kafka message
 		msg := kafka.Message{
 			Key:   []byte("sensor1"), // You can customize the key as needed
-			Value: []byte(sensorData),
+			Value: payload,
 		}
 
 		// Send the message
@@ -113,7 +129,11 @@ func Producer(brokerAddress, topic string, minInterval, maxInterval int) {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error sending message to Kafka: %v\n", err)
 		} else {
-			fmt.Printf("Message sent: %s\n", sensorData)
+			if mode == "json" {
+				fmt.Printf("Message sent: %s\n", string(payload))
+			} else {
+				fmt.Printf("Message sent: %v\n---\n", payload)
+			}
 		}
 
 		// Validate and adjust intervals if necessary

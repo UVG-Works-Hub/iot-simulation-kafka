@@ -9,6 +9,14 @@ import (
 	"os"
 )
 
+// ModeType defines the type for mode
+type ModeType string
+
+const (
+	JSONMode    ModeType = "json"
+	CompactMode ModeType = "compact"
+)
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Error: No subcommand provided")
@@ -25,6 +33,7 @@ func main() {
 		topic := producerCmd.String("topic", "", "Kafka topic name (required)")
 		minInterval := producerCmd.Int("min-interval", 15, "Minimum interval between messages (in seconds)")
 		maxInterval := producerCmd.Int("max-interval", 30, "Maximum interval between messages (in seconds)")
+		mode := producerCmd.String("mode", "json", "Mode of operation: 'json' or 'compact'")
 
 		producerCmd.Parse(os.Args[2:])
 
@@ -34,13 +43,20 @@ func main() {
 			os.Exit(1)
 		}
 
-		Producer(*broker, *topic, *minInterval, *maxInterval)
+		if *mode != string(JSONMode) && *mode != string(CompactMode) {
+			fmt.Println("Error: --mode must be either 'json' or 'compact'")
+			producerCmd.Usage()
+			os.Exit(1)
+		}
+
+		Producer(*broker, *topic, *minInterval, *maxInterval, *mode)
 
 	case "consumer":
 		consumerCmd := flag.NewFlagSet("consumer", flag.ExitOnError)
 		broker := consumerCmd.String("broker", "localhost:9092", "Kafka broker address")
 		topic := consumerCmd.String("topic", "", "Kafka topic name (required)")
 		group := consumerCmd.String("group", "weather_group", "Kafka consumer group ID")
+		mode := consumerCmd.String("mode", "json", "Mode of operation: 'json' or 'compact'")
 
 		consumerCmd.Parse(os.Args[2:])
 
@@ -50,7 +66,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		Consumer(*broker, *topic, *group)
+		if *mode != string(JSONMode) && *mode != string(CompactMode) {
+			fmt.Println("Error: --mode must be either 'json' or 'compact'")
+			consumerCmd.Usage()
+			os.Exit(1)
+		}
+
+		Consumer(*broker, *topic, *group, *mode)
 
 	case "create_topic":
 		createCmd := flag.NewFlagSet("create_topic", flag.ExitOnError)

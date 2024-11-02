@@ -1,7 +1,8 @@
 # iot-simulation-kafka
-Simulating a meteorology producer-consumer model using Kafka.
 
-A Go-based application that simulates IoT sensor data using Kafka. The application supports producing sensor data, consuming and storing data, and managing Kafka topics programmatically.
+Simulating a meteorology producer-consumer model using Kafka with support for compact payloads.
+
+A Go-based application that simulates IoT sensor data using Kafka. The application supports producing sensor data in both traditional JSON format and a compact 3-byte payload format, consuming and storing data, and managing Kafka topics programmatically.
 
 ## Table of Contents
 
@@ -19,10 +20,11 @@ A Go-based application that simulates IoT sensor data using Kafka. The applicati
 
 ## Features
 
-- **Producer**: Generates and sends simulated sensor data to a specified Kafka topic.
-- **Consumer**: Listens to a Kafka topic, receives sensor data, and writes it to a CSV file.
+- **Producer**: Generates and sends simulated sensor data to a specified Kafka topic in either JSON or compact format.
+- **Consumer**: Listens to a Kafka topic, receives sensor data, writes it to a CSV file, and displays real-time plots for temperature and humidity.
 - **Create Topic**: Programmatically creates a Kafka topic with specified configurations.
 - **Delete Topic**: Programmatically deletes a specified Kafka topic.
+- **Dual Mode Operation**: Supports both traditional JSON payloads and compact 3-byte payloads to accommodate environments with payload size constraints (e.g., LoRa, Sigfox).
 
 ## Prerequisites
 
@@ -57,33 +59,42 @@ A Go-based application that simulates IoT sensor data using Kafka. The applicati
 
 ## Usage
 
-The application supports four primary operations: `producer`, `consumer`, `create_topic`, and `delete_topic`. Each operation has its own set of flags.
+The application supports five primary operations: `producer`, `consumer`, `create_topic`, `delete_topic`, and `help`. Each operation has its own set of flags.
 
 ### Producer
 
-**Description**: Generates and sends simulated sensor data to a specified Kafka topic.
+**Description**: Generates and sends simulated sensor data to a specified Kafka topic in either JSON or compact mode.
 
 **Command**:
 
 ```bash
-./weather.exe producer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME> --min-interval=<MIN_SECONDS> --max-interval=<MAX_SECONDS>
+./weather.exe producer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME> --mode=<MODE> --min-interval=<MIN_SECONDS> --max-interval=<MAX_SECONDS>
 ```
 
 **Flags**:
 
 - `--broker` (Optional): Kafka broker address. Default is `localhost:9092`.
 - `--topic` (Required): Kafka topic name.
+- `--mode` (Optional): Mode of operation. Options:
+  - `json` (Default): Sends data as JSON strings.
+  - `compact`: Sends data as compact 3-byte payloads.
 - `--min-interval` (Optional): Minimum interval between messages in seconds. Default is `15`.
 - `--max-interval` (Optional): Maximum interval between messages in seconds. Default is `30`.
 
+**Example**:
+
+```bash
+./weather.exe producer --broker=localhost:9092 --topic=weather --mode=compact --min-interval=10 --max-interval=20
+```
+
 ### Consumer
 
-**Description**: Listens to a Kafka topic, receives sensor data, and writes it to a CSV file. And also plot in realtime.
+**Description**: Listens to a Kafka topic, receives sensor data, writes it to a CSV file, and displays real-time plots for temperature and humidity. Supports both JSON and compact payload formats.
 
 **Command**:
 
 ```bash
-./weather.exe consumer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME> --group=<GROUP_ID>
+./weather.exe consumer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME> --group=<GROUP_ID> --mode=<MODE>
 ```
 
 **Flags**:
@@ -91,6 +102,15 @@ The application supports four primary operations: `producer`, `consumer`, `creat
 - `--broker` (Optional): Kafka broker address. Default is `localhost:9092`.
 - `--topic` (Required): Kafka topic name.
 - `--group` (Optional): Kafka consumer group ID. Default is `weather_group`.
+- `--mode` (Optional): Mode of operation. Options:
+  - `json` (Default): Expects data in JSON format.
+  - `compact`: Expects data in compact 3-byte payloads.
+
+**Example**:
+
+```bash
+./weather.exe consumer --broker=localhost:9092 --topic=weather --group=weather_group --mode=compact
+```
 
 ### Create Topic
 
@@ -109,6 +129,12 @@ The application supports four primary operations: `producer`, `consumer`, `creat
 - `--partitions` (Optional): Number of partitions. Default is `1`.
 - `--replicas` (Optional): Replication factor. Default is `1`.
 
+**Example**:
+
+```bash
+./weather.exe create_topic --broker=localhost:9092 --topic=weather --partitions=3 --replicas=2
+```
+
 ### Delete Topic
 
 **Description**: Programmatically deletes a specified Kafka topic.
@@ -124,45 +150,67 @@ The application supports four primary operations: `producer`, `consumer`, `creat
 - `--broker` (Optional): Kafka broker address. Default is `localhost:9092`.
 - `--topic` (Required): Kafka topic name.
 
+**Example**:
+
+```bash
+./weather.exe delete_topic --broker=localhost:9092 --topic=weather
+```
+
 ## Examples
 
 ### 1. **Create a Kafka Topic**
 
 ```bash
-./weather.exe create_topic --broker=164.92.76.15:9092 --topic=21881 --partitions=3 --replicas=2
+./weather.exe create_topic --broker=localhost:9092 --topic=weather --partitions=3 --replicas=2
 ```
 
 **Output**:
 
 ```
-Topic 21881 created successfully
+Topic weather created successfully.
 ```
 
-### 2. **Run the Producer**
+### 2. **Run the Producer in JSON Mode**
 
 ```bash
-./weather.exe producer --broker=164.92.76.15:9092 --topic=21881 --min-interval=10 --max-interval=20
+./weather.exe producer --broker=localhost:9092 --topic=weather --mode=json --min-interval=10 --max-interval=20
 ```
 
 **Output**:
 
 ```
-Kafka Producer started. Sending data every 15-30 seconds...
+Kafka Producer started in json mode. Sending data every 10-20 seconds...
 Message sent: {"temperature":54.23,"humidity":60,"wind_direction":"NE"}
 Message sent: {"temperature":56.78,"humidity":55,"wind_direction":"SW"}
 ...
 ```
 
-### 3. **Run the Consumer**
+### 3. **Run the Producer in Compact Mode**
 
 ```bash
-./weather.exe consumer --broker=164.92.76.15:9092 --topic=21881 --group=weather_group
+./weather.exe producer --broker=localhost:9092 --topic=weather --mode=compact --min-interval=10 --max-interval=20
 ```
 
 **Output**:
 
 ```
-Kafka Consumer started. Listening for messages and writing to sensor_data.csv...
+Kafka Producer started in compact mode. Sending data every 10-20 seconds...
+Message sent: [0 125 56]
+Message sent: [0 130 12]
+...
+```
+
+### 4. **Run the Consumer in JSON Mode**
+
+```bash
+./weather.exe consumer --broker=localhost:9092 --topic=weather --group=weather_group --mode=json
+```
+
+**Output**:
+
+```
+[TermUI Interface Displaying Temperature and Humidity Charts]
+Log:
 Message received - Timestamp: 2024-04-27T12:34:56Z, Temperature: 54.23°C, Humidity: 60%, Wind Direction: NE
 Message received - Timestamp: 2024-04-27T12:35:10Z, Temperature: 56.78°C, Humidity: 55%, Wind Direction: SW
 ...
@@ -177,16 +225,41 @@ Timestamp,Temperature (°C),Humidity (%),Wind Direction
 ...
 ```
 
-### 4. **Delete a Kafka Topic**
+### 5. **Run the Consumer in Compact Mode**
 
 ```bash
-./weather.exe delete_topic --broker=164.92.76.15:9092 --topic=21881
+./weather.exe consumer --broker=localhost:9092 --topic=weather --group=weather_group --mode=compact
 ```
 
 **Output**:
 
 ```
-Topic 21881 deleted successfully
+[TermUI Interface Displaying Temperature and Humidity Charts]
+Log:
+Message received - Timestamp: 2024-04-27T12:34:56Z, Temperature: 54.23°C, Humidity: 60%, Wind Direction: NE
+Message received - Timestamp: 2024-04-27T12:35:10Z, Temperature: 56.78°C, Humidity: 55%, Wind Direction: SW
+...
+```
+
+**CSV Output (`sensor_data.csv`):**
+
+```csv
+Timestamp,Temperature (°C),Humidity (%),Wind Direction
+2024-04-27T12:34:56Z,54.23,60,NE
+2024-04-27T12:35:10Z,56.78,55,SW
+...
+```
+
+### 6. **Delete a Kafka Topic**
+
+```bash
+./weather.exe delete_topic --broker=localhost:9092 --topic=weather
+```
+
+**Output**:
+
+```
+Topic weather deleted successfully.
 ```
 
 ## Troubleshooting
@@ -194,18 +267,26 @@ Topic 21881 deleted successfully
 - **Unknown Topic or Partition Error**: Ensure the Kafka topic exists. Use the `create_topic` subcommand to create it.
 
   ```bash
-  ./weather.exe create_topic --broker=164.92.76.15:9092 --topic=21881
+  ./weather.exe create_topic --broker=localhost:9092 --topic=weather
   ```
 
 - **Connection Issues**: Verify that the Kafka broker address and port are correct and that the broker is reachable.
 
   ```bash
-  telnet 164.92.76.15 9092
+  telnet localhost 9092
+  ```
+
+- **Invalid Mode Error**: Ensure that the `--mode` flag is set to either `json` or `compact`.
+
+  ```bash
+  ./weather.exe producer --mode=compact
   ```
 
 - **Permissions**: Ensure that the user running the application has the necessary permissions to create or delete Kafka topics.
 
 - **CSV File Not Updating**: Check file permissions and ensure no other process is locking `sensor_data.csv`.
+
+- **TermUI Initialization Failure**: Ensure that your terminal supports TermUI and that no other processes are interfering with the UI rendering.
 
 ## License
 

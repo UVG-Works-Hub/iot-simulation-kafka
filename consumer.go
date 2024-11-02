@@ -5,10 +5,10 @@ package main
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	ui "github.com/gizak/termui/v3"
@@ -17,8 +17,8 @@ import (
 )
 
 // Consumer reads messages from a Kafka topic, writes them to a CSV file,
-// and plots temperature and humidity in real-time.
-func Consumer(brokerAddress, topic, groupID string) {
+// decodes them based on the mode, prints raw bytes for validation, and plots temperature and humidity in real-time.
+func Consumer(brokerAddress, topic, groupID string, mode string) {
 	// Initialize TermUI
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -29,7 +29,7 @@ func Consumer(brokerAddress, topic, groupID string) {
 	tempChart := widgets.NewPlot()
 	tempChart.Title = "Temperature (°C)"
 	tempChart.Data = [][]float64{}
-	tempChart.SetRect(0, 0, 120, 15)
+	tempChart.SetRect(0, 0, 130, 15)
 	tempChart.AxesColor = ui.ColorWhite
 	tempChart.LineColors[0] = ui.ColorRed
 	tempChart.Marker = widgets.MarkerDot
@@ -37,7 +37,7 @@ func Consumer(brokerAddress, topic, groupID string) {
 	humChart := widgets.NewPlot()
 	humChart.Title = "Humidity (%)"
 	humChart.Data = [][]float64{}
-	humChart.SetRect(0, 16, 120, 30)
+	humChart.SetRect(0, 16, 130, 30)
 	humChart.AxesColor = ui.ColorWhite
 	humChart.LineColors[0] = ui.ColorBlue
 	humChart.Marker = widgets.MarkerDot
@@ -45,7 +45,7 @@ func Consumer(brokerAddress, topic, groupID string) {
 	// Create a log box for displaying messages within TermUI
 	logBox := widgets.NewParagraph()
 	logBox.Title = "Log"
-	logBox.SetRect(0, 32, 120, 40)
+	logBox.SetRect(0, 32, 130, 40)
 	logBox.Text = "Kafka Consumer started. Listening for messages...\nPress 'q' to quit."
 
 	// Render the UI
@@ -53,7 +53,7 @@ func Consumer(brokerAddress, topic, groupID string) {
 
 	// Kafka Reader (Consumer) configuration
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        []string{brokerAddress},
+		Brokers:        strings.Split(brokerAddress, ","),
 		GroupID:        groupID,
 		Topic:          topic,
 		MinBytes:       10e3, // 10KB
@@ -131,11 +131,27 @@ func Consumer(brokerAddress, topic, groupID string) {
 				continue
 			}
 
-			// Parse the JSON message
 			var data SensorData
-			err = json.Unmarshal(m.Value, &data)
-			if err != nil {
-				log.Printf("\nError parsing JSON: %v\n", err)
+			var rawBytes []byte
+
+			if mode == "json" {
+				// JSON Mode
+				err = data.FromJSON(string(m.Value))
+				if err != nil {
+					log.Printf("\nError parsing JSON: %v\n", err)
+					continue
+				}
+			} else if mode == "compact" {
+				// Compact Mode
+				decodedData, _, _, _, err := Decode(m.Value)
+				if err != nil {
+					log.Printf("\nError decoding compact data: %v\n", err)
+					continue
+				}
+				data = *decodedData
+				rawBytes = m.Value
+			} else {
+				log.Printf("\nUnknown mode: %s. Skipping message.\n", mode)
 				continue
 			}
 
@@ -156,9 +172,19 @@ func Consumer(brokerAddress, topic, groupID string) {
 			}
 			writer.Flush()
 
+			// Prepare log entry
+			var logEntry string
+			if mode == "json" {
+				logEntry = fmt.Sprintf("Message received - Timestamp: %s, Temperature: %.2f°C, Humidity: %d%%, Wind Direction: %s",
+					timestamp, data.Temperature, data.Humidity, data.WindDirection)
+			} else if mode == "compact" {
+				// Format raw bytes as [i j k]
+				rawFormatted := fmt.Sprintf("[%d %d %d]", rawBytes[0], rawBytes[1], rawBytes[2])
+				logEntry = fmt.Sprintf("Message received - Timestamp: %s, Temperature: %.2f°C, Humidity: %d%%, Wind Direction: %s %s",
+					timestamp, data.Temperature, data.Humidity, data.WindDirection, rawFormatted)
+			}
+
 			// Add the new log entry at the beginning of logMessages
-			logEntry := fmt.Sprintf("Message received - Timestamp: %s, Temperature: %.2f°C, Humidity: %d%%, Wind Direction: %s",
-				timestamp, data.Temperature, data.Humidity, data.WindDirection)
 			logMessages = append([]string{logEntry}, logMessages...)
 
 			// Limit the number of lines in logMessages to maxLogLines
@@ -167,10 +193,7 @@ func Consumer(brokerAddress, topic, groupID string) {
 			}
 
 			// Set logBox text to the concatenated log messages
-			logBox.Text = ""
-			for _, message := range logMessages {
-				logBox.Text += message + "\n"
-			}
+			logBox.Text = strings.Join(logMessages, "\n")
 
 			// Append data to slices for plotting
 			tempData = append(tempData, data.Temperature)
