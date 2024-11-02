@@ -43,6 +43,7 @@ A Go-based application that simulates IoT sensor data using Kafka. The applicati
 
    ```bash
    go mod init iot-simulation-kafka
+   go get github.com/gizak/termui/v3
    go get github.com/segmentio/kafka-go
    ```
 
@@ -65,13 +66,15 @@ The application supports four primary operations: `producer`, `consumer`, `creat
 **Command**:
 
 ```bash
-./weather.exe producer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME>
+./weather.exe producer --broker=<BROKER_ADDRESS> --topic=<TOPIC_NAME> --min-interval=<MIN_SECONDS> --max-interval=<MAX_SECONDS>
 ```
 
 **Flags**:
 
 - `--broker` (Optional): Kafka broker address. Default is `localhost:9092`.
 - `--topic` (Required): Kafka topic name.
+- `--min-interval` (Optional): Minimum interval between messages in seconds. Default is `15`.
+- `--max-interval` (Optional): Maximum interval between messages in seconds. Default is `30`.
 
 ### Consumer
 
@@ -138,7 +141,7 @@ Topic 21881 created successfully
 ### 2. **Run the Producer**
 
 ```bash
-./weather.exe producer --broker=164.92.76.15:9092 --topic=21881
+./weather.exe producer --broker=164.92.76.15:9092 --topic=21881 --min-interval=10 --max-interval=20
 ```
 
 **Output**:

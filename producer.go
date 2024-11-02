@@ -78,8 +78,8 @@ func generateSensorData() (string, error) {
 	return string(jsonData), nil
 }
 
-// Producer sends sensor data to the specified Kafka topic
-func Producer(brokerAddress, topic string) {
+// Producer sends sensor data to the specified Kafka topic with configurable intervals
+func Producer(brokerAddress, topic string, minInterval, maxInterval int) {
 	// Initialize the seed for random number generation
 	rand.Seed(time.Now().UnixNano())
 
@@ -93,7 +93,7 @@ func Producer(brokerAddress, topic string) {
 	}
 	defer writer.Close()
 
-	fmt.Println("Kafka Producer started. Sending data every 15-30 seconds...")
+	fmt.Printf("Kafka Producer started. Sending data every %d-%d seconds...\n", minInterval, maxInterval)
 
 	for {
 		sensorData, err := generateSensorData()
@@ -116,8 +116,14 @@ func Producer(brokerAddress, topic string) {
 			fmt.Printf("Message sent: %s\n", sensorData)
 		}
 
-		// Wait between 15 and 30 seconds
-		waitTime := time.Duration(15+rand.Intn(16)) * time.Second
+		// Validate and adjust intervals if necessary
+		if minInterval > maxInterval {
+			fmt.Printf("Warning: min-interval (%d) is greater than max-interval (%d). Adjusting max-interval to %d.\n", minInterval, maxInterval, minInterval)
+			maxInterval = minInterval
+		}
+
+		// Wait between minInterval and maxInterval seconds
+		waitTime := time.Duration(minInterval+rand.Intn(maxInterval-minInterval+1)) * time.Second
 		time.Sleep(waitTime)
 	}
 }

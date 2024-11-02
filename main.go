@@ -23,6 +23,8 @@ func main() {
 		producerCmd := flag.NewFlagSet("producer", flag.ExitOnError)
 		broker := producerCmd.String("broker", "localhost:9092", "Kafka broker address")
 		topic := producerCmd.String("topic", "", "Kafka topic name (required)")
+		minInterval := producerCmd.Int("min-interval", 15, "Minimum interval between messages (in seconds)")
+		maxInterval := producerCmd.Int("max-interval", 30, "Maximum interval between messages (in seconds)")
 
 		producerCmd.Parse(os.Args[2:])
 
@@ -32,7 +34,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		Producer(*broker, *topic)
+		Producer(*broker, *topic, *minInterval, *maxInterval)
 
 	case "consumer":
 		consumerCmd := flag.NewFlagSet("consumer", flag.ExitOnError)
